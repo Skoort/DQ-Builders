@@ -129,12 +129,12 @@ public class Character : MonoBehaviour
 			switch (block.block_type)
 			{  // Same behavior regardless of the Block's type.
 				default:
-					{
-						hotbarUI.PickupBlock(block.block_type);
+				{
+					hotbarUI.PickupBlock(block.block_type);
 
-						chunk.PickupBlock(block);
-						break;
-					}
+					chunk.PickupBlock(block);
+					break;
+				}
 			}
 		}
 	}
@@ -170,20 +170,20 @@ public class Character : MonoBehaviour
 			switch (block_hit.block_type)
 			{
 				case BlockType.CRAFTING_TABLE:
-					{
-						if (Input.GetKey(KeyCode.LeftControl))
-						{  // We are crouching and wish to place a Block here.
-							break;
-						}
-						else
-						{  // We wish to normally interact with this Crafting Table.
-							return;
-						}
-					}
-				default:
-					{  // Do nothing. Proceed to placing a Block.
+				{
+					if (Input.GetKey(KeyCode.LeftControl))
+					{  // We are crouching and wish to place a Block here.
 						break;
 					}
+					else
+					{  // We wish to normally interact with this Crafting Table.
+						return;
+					}
+				}
+				default:
+				{  // Do nothing. Proceed to placing a Block.
+					break;
+				}
 			}
 
 			var pos_to_place = hit_info.point + hit_info.normal.normalized / 2f;
