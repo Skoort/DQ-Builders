@@ -258,7 +258,7 @@ public class Chunk : MonoBehaviour
 		}
 	}
 
-	private Dictionary<Vector3, Block> GetNeighboringBlocks(Vector3 pos)
+	public Dictionary<Vector3, Block> GetNeighboringBlocks(Vector3 pos)
 	{
 		return new Dictionary<Vector3, Block>()
 		{

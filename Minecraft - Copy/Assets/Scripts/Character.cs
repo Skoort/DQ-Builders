@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 [RequireComponent(typeof(CharacterController))]
@@ -21,6 +22,9 @@ public class Character : MonoBehaviour
 	private HotbarUI hotbarUI = null;
 	[SerializeField]
 	private Transform crosshairUI = null;
+
+	[SerializeField]
+	private GameObject _blockItemDropPrefab;
 
 	private void Start()
 	{
@@ -132,7 +136,13 @@ public class Character : MonoBehaviour
 				{
 					hotbarUI.PickupBlock(block.block_type);
 
+					SpawnBlockItemDrop(chunk.transform.position + block.id + new Vector3(0.5F, 0.5F, 0.5F),
+						block.block_type);
+
+					// Must happen after block type is queried as it 
+					// changes the block type to air.
 					chunk.PickupBlock(block);
+
 					break;
 				}
 			}
@@ -196,6 +206,69 @@ public class Character : MonoBehaviour
 			var air_to_replace = chunk_to_place.GetBlock(pos_to_place);
 
 			chunk_to_place.PlaceBlock(air_to_replace, hotbarUI.RemSelectedBlock());
+
+			PushOutAllItemDropsInBlock(chunk_to_place, pos_to_place);
+		}
+	}
+
+	private void SpawnBlockItemDrop(Vector3 globalPos, BlockType blockType)
+	{
+		var itemDrop = Instantiate(_blockItemDropPrefab, globalPos, Quaternion.Euler(0, Random.Range(0, 360), 0), null);
+		var textureComp = itemDrop.GetComponent<TextureBlockItemDrop>();
+		if (textureComp)
+		{
+			textureComp.Initialize(blockType);
+		}
+		else
+		{
+			Debug.LogError($"Spawned block item drop {_blockItemDropPrefab.name} doesn't have a TextureBlockItemDrop component!");
+		}
+		var rigidbody = itemDrop.GetComponent<Rigidbody>();
+		if (rigidbody)
+		{
+			var randSpeedDir = Random.insideUnitSphere;
+			randSpeedDir = new Vector3(randSpeedDir.x, Mathf.Abs(randSpeedDir.y) * 1.5F, randSpeedDir.z);
+			rigidbody.velocity = randSpeedDir * 2.5F;
+		}
+		else
+		{
+			Debug.LogError($"Spawned block item drop {_blockItemDropPrefab.name} doesn't have a Rigidbody component!");
+		}
+	}
+
+	private void PushOutAllItemDropsInBlock(Chunk chunk, Vector3 localPositionToPlace)
+	{
+		var neighbors = chunk.GetNeighboringBlocks(localPositionToPlace);
+
+		var chunkPos = chunk.gameObject.transform.position;
+		var globalBlockOrigin = chunkPos + localPositionToPlace + new Vector3(0.5F, 0.5F, 0.5F);
+		
+		var colliders = Physics.OverlapBox(globalBlockOrigin, Vector3.one * 0.5F, Quaternion.identity, LayerMask.GetMask("Item Drop"));
+		foreach (var collider in colliders)
+		{
+			var itemPos = collider.attachedRigidbody.position;
+
+			var smallestDir = Vector3.zero;
+			var smallestDeltaMag = float.MaxValue;
+			foreach (var neighbor in neighbors)
+			{
+				if (neighbor.Value != null && neighbor.Value.block_type != BlockType.AIR)
+					continue;
+
+				var delta = (globalBlockOrigin + neighbor.Key * 0.5F) - itemPos;
+				// Here we rely on the alternate definition of the dot product
+				// a dot b = a.x * b.x + a.y * b.y + a.z * b.z
+				// to eliminate any the two axes not in the direction of the neighbor.
+				var deltaMag = Mathf.Abs(Vector3.Dot(delta, neighbor.Key));
+				if (smallestDeltaMag > deltaMag)
+				{
+					smallestDir = neighbor.Key;
+					smallestDeltaMag = deltaMag;
+				}
+			}
+
+			// Add a small constant to the smallestDeltaMag to represent the size of the ItemDrop.
+			collider.transform.position += smallestDir * (smallestDeltaMag + 0.2F);
 		}
 	}
 }

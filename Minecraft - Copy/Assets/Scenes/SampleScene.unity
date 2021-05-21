@@ -1006,12 +1006,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 995569793}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 5, z: 0}
+  m_LocalPosition: {x: 0, y: 7.25, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 578967135}
   m_Father: {fileID: 0}
-  m_RootOrder: 8
+  m_RootOrder: 9
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1044007545
 GameObject:
@@ -1589,6 +1589,8 @@ MonoBehaviour:
   inventoryUI: {fileID: 394410230}
   hotbarUI: {fileID: 156170117}
   crosshairUI: {fileID: 1178910834}
+  _blockItemDropPrefab: {fileID: 6955431017006352092, guid: fa69409ea406d124b994395f1e767e44,
+    type: 3}
 --- !u!143 &1545805701
 CharacterController:
   m_ObjectHideFlags: 0
@@ -2123,7 +2125,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 9
+  m_RootOrder: 10
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1932981662
 GameObject:
@@ -2473,7 +2475,7 @@ PrefabInstance:
     - target: {fileID: 5993618224683944339, guid: cf1416949ea8f3e44ba9cac1a9a8bf51,
         type: 3}
       propertyPath: m_RootOrder
-      value: 10
+      value: 8
       objectReference: {fileID: 0}
     - target: {fileID: 5993618224683944339, guid: cf1416949ea8f3e44ba9cac1a9a8bf51,
         type: 3}

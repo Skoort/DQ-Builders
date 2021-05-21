@@ -65,7 +65,7 @@ public class ChunkLoader : MonoBehaviour
 			//Task.Run(() => ShowChunksWithinView());
 			//Task.Run(() => HideChunksOutsideView());
 			ShowChunksWithinView();
-			HideChunksOutsideView();
+			//HideChunksOutsideView();
 
 			yield return new WaitForSeconds(0.1F);
 		}

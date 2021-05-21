@@ -4,6 +4,11 @@ using UnityEngine;
 
 public class CraftingRecipe
 {
+	// Crafting will work by throwing X items onto a crafting table
+	// and if they have a recipe, they will join together in the center
+	// of the top face and combine into a new item with a puff of smoke,
+	// which will appear on the center of the crafting table.
+
 	private ItemContainer.Slot[] items_in;
 
 	private ItemContainer.Slot items_out;
