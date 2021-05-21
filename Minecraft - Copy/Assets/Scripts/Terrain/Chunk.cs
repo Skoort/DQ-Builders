@@ -34,51 +34,139 @@ public class Chunk : MonoBehaviour
 
 	private Stack<int> free_spots;
 
-	private bool border_update_required;
 
-	private bool _is_initialized;
-	private bool _is_mesh_generated;
+	private Vector3 _copyOfPositionForTask;
+
+	private bool _isDoneGenerating;
+	private bool _isBorderUpdateRequired;
+
+	private static readonly object locker;
 
 	public Chunk Initialize(Vector2 chunk_id)
 	{
 		id = chunk_id;
-
 		resolution = ChunkLoader.instance.ChunkResolution;
 
-		if (!_saveGame.HasChunkBeenModified(id))
+		_copyOfPositionForTask = transform.position;
+
+		var isChunkModified = _saveGame.HasChunkBeenModified(id);
+
+		InitMapData(isChunkModified);
+		ClearMeshData();
+		Task.Run(() =>
 		{
-			GenerateBiomesmap();
-			GenerateHeightmap();
-			GenerateBlocks();
-			_is_initialized = true;
-		}
-		else
-		{
-			GenerateBlocksAndMeshFromSave();
-			FixNeighboringChunks();
-			_is_initialized = true;
-			_is_mesh_generated = true;
-		}
+			if (isChunkModified)
+			{
+				try
+				{
+					GenerateBlocksAndMeshFromSave();
+				}
+				catch (Exception e)
+				{
+					Debug.LogError($"Error generating chunk {id} from save: {e.Message} {e.InnerException?.Message}");
+				}
+			}
+			else
+			{
+				try
+				{
+					try
+					{
+						GenerateBiomesmap();
+					}
+					catch (Exception e1)
+					{
+						Debug.LogError($"Error generating chunk (1) {id}: {e1.Message} {e1.InnerException?.Message}");
+					}
+					try
+					{
+						GenerateHeightmap();
+					}
+					catch (Exception e2)
+					{
+						Debug.LogError($"Error generating chunk (2) {id}: {e2.Message} {e2.InnerException?.Message}");
+					}
+					try
+					{
+						GenerateBlocks();
+					}
+					catch (Exception e3)
+					{
+						Debug.LogError($"Error generating chunk (3) {id}: {e3.Message} {e3.InnerException?.Message}");
+					}
+					try
+					{
+						GenerateMesh();
+					}
+					catch (Exception e4)
+					{
+						Debug.LogError($"Error generating chunk (4) {id}: {e4.Message} {e4.InnerException?.Message}");
+					}
+				}
+				catch (Exception e)
+				{
+					Debug.LogError($"Error generating chunk {id}: {e.Message} {e.InnerException?.Message}");
+				}
+			}
+			_isDoneGenerating = true;
+		});
 
 		return this;
 	}
 
 	private void Update()
 	{
-		if (_is_initialized && !_is_mesh_generated)
+		if (_isDoneGenerating && mesh == null)
 		{
-			//BlurTextures();
-			GenerateMesh();  // Requires the Blocks from this Chunk and neighboring Chunks to exist.
-			FixNeighboringChunks();
-			_is_mesh_generated = true;
+			try
+			{
+				ShowMesh();
+			}
+			catch (Exception e)
+			{
+				Debug.LogError($"Error showing mesh for chunk {id}: {e.Message} {e.InnerException?.Message}");
+			}
 		}
 
-		if(border_update_required)
+		if (_isBorderUpdateRequired)
 		{
-			UpdateBorder();  // We call it in Update, because it relies on information in Start.
-			
-			border_update_required = false;
+			Task.Run(() => UpdateBorder());
+			_isBorderUpdateRequired = false;
 		}
+	}
+
+	private void InitMapData(bool isChunkModified)
+	{
+		if (!isChunkModified)
+		{
+			biomesmap = new float[resolution, resolution];
+			heightmap = new int[resolution, resolution];
+			blocks = new Dictionary<Vector3, Block>();
+			plants = new Dictionary<Vector3, Transform>();
+		}
+	}
+
+	private void ClearMeshData()
+	{
+		this.verts = new List<Vector3>();
+		this.normals = new List<Vector3>();
+		this.UVs = new List<Vector3>();
+		//this.UVs2 = new List<Vector2>();
+		this.quads = new List<int>();
+		this.free_spots = new Stack<int>();
+	}
+
+	private void ShowMesh()
+	{
+		this.mesh = new Mesh();
+		this.mesh.SetVertices(this.verts);
+		this.mesh.SetNormals(this.normals);
+		this.mesh.SetUVs(0, this.UVs);
+		//this.mesh.SetUVs(1, this.UVs2);
+		this.mesh.SetIndices(this.quads.ToArray(), MeshTopology.Quads, 0);
+
+		GetComponent<MeshFilter>().mesh = mesh;
+		GetComponent<MeshCollider>().sharedMesh = mesh;
 	}
 
 	private void FixNeighboringChunks()
@@ -88,7 +176,7 @@ public class Chunk : MonoBehaviour
 		foreach(var chunk in neighboring_chunks)
 		{
 			if(chunk != null && chunk.gameObject.activeInHierarchy)
-				chunk.border_update_required = true; // chunk.UpdateBorder();
+				chunk._isBorderUpdateRequired = true; // chunk.UpdateBorder();
 		}
 	}
 
@@ -106,20 +194,11 @@ public class Chunk : MonoBehaviour
 				UpdateBlock(block);
 			}
 		}
-
-		this.mesh.SetVertices(this.verts);
-		this.mesh.SetNormals(this.normals);
-		this.mesh.SetUVs(0, this.UVs);
-		//this.mesh.SetUVs(1, this.UVs2);
-		this.mesh.SetIndices(this.quads.ToArray(), MeshTopology.Quads, 0);
-
-		GetComponent<MeshFilter>().mesh = mesh;
-		GetComponent<MeshCollider>().sharedMesh = mesh;
 	}
 
 	private void GenerateBiomesmap()
 	{
-		biomesmap = new float[resolution, resolution];
+		//biomesmap = new float[resolution, resolution];
 
 		for (int z = 0; z < resolution; ++z)
 		{
@@ -139,7 +218,7 @@ public class Chunk : MonoBehaviour
 
 	private void GenerateHeightmap()
 	{
-		heightmap = new int[resolution, resolution];
+		//heightmap = new int[resolution, resolution];
 
 		for (int z = 0; z < resolution; ++z)
 		{
@@ -152,8 +231,8 @@ public class Chunk : MonoBehaviour
 
 	private void GenerateBlocks()
 	{
-		blocks = new Dictionary<Vector3, Block>();
-		plants = new Dictionary<Vector3, Transform>();
+		//blocks = new Dictionary<Vector3, Block>();
+		//plants = new Dictionary<Vector3, Transform>();
 
 		for (int z = 0; z < resolution; ++z)
 		{
@@ -185,14 +264,14 @@ public class Chunk : MonoBehaviour
 
 					blocks.Add(pos, block);
 				}
-
+				/*
 				if(x + transform.position.x == 0 && z + transform.position.z == 0)
 				{
 					Debug.Log("Height of start is: " + (height + 1));
 				}
-
+				*/
 				// Create a navigable area at the bottom AIR block.
-				Navigator.instance.AddNavigable(transform.position + new Vector3(x, height + 1, z));
+				//Navigator.instance.AddNavigable(_copyOfPositionForTask + new Vector3(x, height + 1, z));
 
 
 				// Check if you want to put a plant in this location.
@@ -206,8 +285,8 @@ public class Chunk : MonoBehaviour
 					//Debug.Log("Generating Ground Block at: " + (transform.position + pos));
 
 					BlockType block_type;
-					if ((height - min_height) > 2 * (0.9F + 0.5F * Mathf.PerlinNoise((transform.position.x + x + 1543) * 0.013F, (transform.position.z + z + 1923) * 0.013F))
-					|| height > (ChunkLoader.instance.NoiseAmplitude + ChunkLoader.instance.NoiseAmplitude2) * (0.4F + 0.5F * Mathf.PerlinNoise((transform.position.x + x - 10000) * 0.013F, (transform.position.z + z - 17000) * 0.013F))
+					if ((height - min_height) > 2 * (0.9F + 0.5F * Mathf.PerlinNoise((_copyOfPositionForTask.x + x + 1543) * 0.013F, (_copyOfPositionForTask.z + z + 1923) * 0.013F))
+					|| height > (ChunkLoader.instance.NoiseAmplitude + ChunkLoader.instance.NoiseAmplitude2) * (0.4F + 0.5F * Mathf.PerlinNoise((_copyOfPositionForTask.x + x - 10000) * 0.013F, (_copyOfPositionForTask.z + z - 17000) * 0.013F))
 					|| height > (ChunkLoader.instance.NoiseAmplitude + ChunkLoader.instance.NoiseAmplitude2) * 0.7F)
 					{
 						block_type = BlockType.STONE;
@@ -304,32 +383,42 @@ public class Chunk : MonoBehaviour
 
 	public Block GetBlock(Vector3 pos)
 	{
-		if (blocks.ContainsKey(pos))
-		{  // This Chunk contains a Block with this key. Return it.
-			return blocks[pos];
-		} else
-		if (PositionInBounds(pos))
-		{  // The desired key does not match a Block in this Chunk.
-			return null;
-		} else
-		{  // This Chunk does not contain the key. Check if the key belongs to a different Chunk.
-			var neighboring_chunk = ChunkLoader.instance.GetChunk(transform.position + pos);  // Get the Chunk which has this position.
-
-
-			if (neighboring_chunk)  // Check whether the Chunk we need exists.
-			{
-				// Wrap the position at the borders.
-				pos.x = MathUtils.Mod(Mathf.FloorToInt(pos.x), resolution);
-				pos.z = MathUtils.Mod(Mathf.FloorToInt(pos.z), resolution);
-
-				var block = neighboring_chunk.GetBlock(pos);
-
-				return block;
-			}
-			else
-			{
+		try
+		{
+			if (blocks.ContainsKey(pos))
+			{  // This Chunk contains a Block with this key. Return it.
+				return blocks[pos];
+			} else
+			if (PositionInBounds(pos))
+			{  // The desired key does not match a Block in this Chunk.
 				return null;
+			} else
+			if (!_isDoneGenerating)
+			{  // We don't want to access this. We'll handle it in the border update.
+				return null;
+			} else
+			{  // This Chunk does not contain the key. Check if the key belongs to a different Chunk.
+				var neighboring_chunk = ChunkLoader.instance.GetChunk(_copyOfPositionForTask + pos);  // Get the Chunk which has this position.
+				if (neighboring_chunk)
+				{
+					// Wrap the position at the borders.
+					pos.x = MathUtils.Mod(Mathf.FloorToInt(pos.x), resolution);
+					pos.z = MathUtils.Mod(Mathf.FloorToInt(pos.z), resolution);
+
+					var block = neighboring_chunk.GetBlock(pos);
+
+					return block;
+				}
+				else
+				{
+					return null;
+				}
 			}
+		}
+		catch (Exception e)
+		{
+			Debug.LogError($"Exception inside GetBlock: {e.Message} {e.InnerException?.Message}");
+			return null;
 		}
 	}
 
@@ -351,8 +440,8 @@ public class Chunk : MonoBehaviour
 		var offset_z = ChunkLoader.instance.NoiseOffsetZ;
 		var world_amplitude = ChunkLoader.instance.NoiseAmplitude;
 
-		var x_noise = (transform.position.x + x) * scale_x + offset_x;
-		var z_noise = (transform.position.z + z) * scale_z + offset_z;
+		var x_noise = (_copyOfPositionForTask.x + x) * scale_x + offset_x;
+		var z_noise = (_copyOfPositionForTask.z + z) * scale_z + offset_z;
 		/*
 		if (Mathf.PerlinNoise(x_noise, z_noise) < 0.5)
 		{
@@ -376,19 +465,19 @@ public class Chunk : MonoBehaviour
 
 	private int WorldNoiseFunction(int x, int z, float biome)
 	{
-		var x_noise_grass = (transform.position.x + x) * 0.02F + -11043;
-		var z_noise_grass = (transform.position.z + z) * 0.02F + 20275;
+		var x_noise_grass = (_copyOfPositionForTask.x + x) * 0.02F + -11043;
+		var z_noise_grass = (_copyOfPositionForTask.z + z) * 0.02F + 20275;
 
 		var height1 = Mathf.PerlinNoise(x_noise_grass, z_noise_grass) * 48;
 
-		var x_noise_grass2 = (transform.position.x + x) * 0.042F + 5421;
-		var z_noise_grass2 = (transform.position.z + z) * 0.042F + 42456;
+		var x_noise_grass2 = (_copyOfPositionForTask.x + x) * 0.042F + 5421;
+		var z_noise_grass2 = (_copyOfPositionForTask.z + z) * 0.042F + 42456;
 
 		height1 += Mathf.PerlinNoise(x_noise_grass2, z_noise_grass2) * 3 - 1.5F;
 
 
-		var x_noise_sand = (transform.position.x + x) * 0.015F + -10043;
-		var z_noise_sand = (transform.position.z + z) * 0.0152F + -33275;
+		var x_noise_sand = (_copyOfPositionForTask.x + x) * 0.015F + -10043;
+		var z_noise_sand = (_copyOfPositionForTask.z + z) * 0.0152F + -33275;
 
 		var height2 = Mathf.PerlinNoise(x_noise_sand, z_noise_sand) * 5;
 
@@ -470,13 +559,6 @@ public class Chunk : MonoBehaviour
 
 	private void GenerateBlocksAndMeshFromSave()
 	{
-		this.mesh = new Mesh();
-		this.verts = new List<Vector3>();
-		this.normals = new List<Vector3>();
-		this.UVs = new List<Vector3>();
-		//this.UVs2 = new List<Vector2>();
-		this.quads = new List<int>();
-		this.free_spots = new Stack<int>();
 		blocks = new Dictionary<Vector3, Block>();
 
 		var chunkSaveData = _saveGame.GetChunkSaveData(id);
@@ -534,133 +616,138 @@ public class Chunk : MonoBehaviour
 				}
 			}
 		}
-
-		this.mesh.SetVertices(this.verts);
-		this.mesh.SetNormals(this.normals);
-		this.mesh.SetUVs(0, this.UVs);
-		//this.mesh.SetUVs(1, this.UVs2);
-		this.mesh.SetIndices(this.quads.ToArray(), MeshTopology.Quads, 0);
-
-		GetComponent<MeshFilter>().mesh = mesh;
-		GetComponent<MeshCollider>().sharedMesh = mesh;
 	}
 
 	private void GenerateMesh()
 	{
-		this.mesh = new Mesh();
-		this.verts = new List<Vector3>();
-		this.normals = new List<Vector3>();
-		this.UVs = new List<Vector3>();
-		//this.UVs2 = new List<Vector2>();
-		this.quads = new List<int>();
-		this.free_spots = new Stack<int>();
-
 		foreach(var block in blocks.Values)
 		{
 			UpdateBlock(block);
 		}
-
-		this.mesh.SetVertices(this.verts);
-		this.mesh.SetNormals(this.normals);
-		this.mesh.SetUVs(0, this.UVs);
-		//this.mesh.SetUVs(1, this.UVs2);
-		this.mesh.SetIndices(this.quads.ToArray(), MeshTopology.Quads, 0);
-
-		GetComponent<MeshFilter>().mesh = mesh;
-		GetComponent<MeshCollider>().sharedMesh = mesh;
 	}
 
 	private void UpdateBlock(Block block)
 	{
 		var num_connections = 0;
 
-		var neighbors = GetNeighboringBlocks(block.id);
-
-		var pos = block.id;
-
-		foreach(var neighbor in neighbors)
+		try
 		{
-			var dir = neighbor.Key;
-			var block2 = neighbor.Value;
+			var neighbors = GetNeighboringBlocks(block.id);
 
-			if(block.block_type == BlockType.AIR && block2 != null && block2.block_type != BlockType.AIR)
-			{  // If the neighbor exists and is not Air, then this Air Block has a connection to it.
-				++num_connections;
-			} else
-			if(block.block_type != BlockType.AIR && block2 != null && block2.block_type == BlockType.AIR)
-			{  // If the neighbor exists and is Air, then this non-Air Block has a connection to it.
-				++num_connections;
+			var pos = block.id;
 
-				// Show this specific face.
+			foreach(var neighbor in neighbors)
+			{
+				var dir = neighbor.Key;
+				var block2 = neighbor.Value;
 
-				var face = BlockData.ConvertDirToIdx(dir);  // The index into BlockData.vertices which holds the desired face's vertices.
+				if (block2 == null) continue;
 
-				if(block.GetQuadIndices()[face] != -1)  // We already drew this Quad, stop drawing it.
-					continue;
-
-				var verts = new List<Vector3>(BlockData.vertices[face]);
-				var normals = BlockData.normals[face];
-				var UVs = BlockData.UVs3[face];
-				for(int i = 0; i < UVs.Length; ++i)  // Change the Z components of the UV to match the type of the block.
-				{
-					UVs[i].z = (int) (block.block_type - 1) * 3;
-				}
-
-				//var UVs2 = BlockData.UVs2[(int)block.block_type - 1];
-				var quads = new List<int>(BlockData.quads[0]);
-
-				var spot = (free_spots.Count > 0) ? free_spots.Pop() : this.verts.Count;
-
-				block.SetQuadIndex(dir, spot);  // Put in the location of this Quad for the correct Quad.
-
-				// Modify the contents of the verts and quads.
-				for (int i = 0; i < 4; ++i)
-				{
-					verts[i] += pos;  // Add the local position to the vertex.
-					quads[i] += spot;
-				}
-
-				if (spot != this.verts.Count)
-				{
-					// Replace the old contents of that spot with the face.
-					for (int i = 0; i < 4; ++i)
+				if(block.block_type == BlockType.AIR && block2.block_type != BlockType.AIR)
+				{  // If the neighbor exists and is not Air, then this Air Block has a connection to it.
+					++num_connections;
+				} else
+				if(block.block_type != BlockType.AIR && block2.block_type == BlockType.AIR)
+				{  // If the neighbor exists and is Air, then this non-Air Block has a connection to it.
+					try
 					{
-						this.verts[spot + i] = verts[i];
-						this.quads[spot + i] = quads[i];
-						this.UVs[spot + i] = UVs[i];
-						//this.UVs2[spot + i] = UVs2[i];
-						this.normals[spot + i] = normals[i];
+						++num_connections;
+
+						// Show this specific face.
+
+						var face = BlockData.ConvertDirToIdx(dir);  // The index into BlockData.vertices which holds the desired face's vertices.
+
+						if (block.GetQuadIndices()[face] != -1)  // We already drew this Quad, stop drawing it.
+							continue;
+
+						var verts = new List<Vector3>(BlockData.vertices[face]);
+						var normals = BlockData.normals[face];
+						var UVs = BlockData.UVs3[face];
+						for (int i = 0; i < UVs.Length; ++i)  // Change the Z components of the UV to match the type of the block.
+						{
+							UVs[i].z = (int)(block.block_type - 1) * 3;
+						}
+
+						//var UVs2 = BlockData.UVs2[(int)block.block_type - 1];
+						var quads = new List<int>(BlockData.quads[0]);
+
+						var spot = (free_spots.Count > 0) ? free_spots.Pop() : this.verts.Count;
+
+						block.SetQuadIndex(dir, spot);  // Put in the location of this Quad for the correct Quad.
+
+						// Modify the contents of the verts and quads.
+						for (int i = 0; i < 4; ++i)
+						{
+							verts[i] += pos;  // Add the local position to the vertex.
+							quads[i] += spot;
+						}
+
+						if (spot != this.verts.Count)
+						{
+							// Replace the old contents of that spot with the face.
+							for (int i = 0; i < 4; ++i)
+							{
+								this.verts[spot + i] = verts[i];
+								this.quads[spot + i] = quads[i];
+								this.UVs[spot + i] = UVs[i];
+								//this.UVs2[spot + i] = UVs2[i];
+								this.normals[spot + i] = normals[i];
+							}
+						}
+						else
+						{  // There is no unused space, we have to modify the size of the List.
+							this.verts.AddRange(verts);
+							this.normals.AddRange(normals);
+							this.UVs.AddRange(UVs);
+							//this.UVs2.AddRange(UVs2);
+							this.quads.AddRange(quads);
+						}
 					}
-				}
-				else
-				{  // There is no unused space, we have to modify the size of the List.
-					this.verts.AddRange(verts);
-					this.normals.AddRange(normals);
-					this.UVs.AddRange(UVs);
-					//this.UVs2.AddRange(UVs2);
-					this.quads.AddRange(quads);
-				}
-			} else
-			if(block.block_type != BlockType.AIR && block2 != null && block2.block_type != BlockType.AIR)
-			{  // The face shouldn't be seen.
-				var face = BlockData.ConvertDirToIdx(dir);  // The index into BlockData.vertices which holds the desired face's vertices.
-				var face_index = block.GetQuadIndices()[face];
+					catch (Exception e)
+					{
+						Debug.LogError($"The error occurs in 2nd if: {e.Message} {e.InnerException?.Message}");
+					}
+				} else
+				if(block.block_type != BlockType.AIR && block2.block_type != BlockType.AIR)
+				{  // The face shouldn't be seen.
+					try
+					{
+						var face = BlockData.ConvertDirToIdx(dir);  // The index into BlockData.vertices which holds the desired face's vertices.
+						var face_index = block.GetQuadIndices()[face];
 				
-				if(face_index != -1)  // We drew this Quad and yet it shouldn't be visible.
-				{
-					this.free_spots.Push(face_index);
+						if(face_index != -1)  // We drew this Quad and yet it shouldn't be visible.
+						{
+							this.free_spots.Push(face_index);
 
-					for (int j = 0; j < 4; ++j)
-					{
-						this.quads[face_index + j] = 0;  // Make the Quad render a single point (AKA nothing).
+							for (int j = 0; j < 4; ++j)
+							{
+								this.quads[face_index + j] = 0;  // Make the Quad render a single point (AKA nothing).
+							}
+
+							block.GetQuadIndices()[face] = -1;
+						}
 					}
-
-					block.GetQuadIndices()[face] = -1;
+					catch (Exception e)
+					{
+						Debug.LogError($"The error occurs in 3rd if: {e.Message} {e.InnerException?.Message}");
+					}
 				}
 			}
-		}
 
-		block.num_connections = num_connections;
+			block.num_connections = num_connections;
+		}
+		catch (AggregateException ae)
+		{
+			Debug.LogError($"The error occurs when fetching neighbors: {ae.Message}");
+			foreach (var ex in ae.InnerExceptions)
+			{
+				Debug.LogError(ae.Message);
+			}
+		}
+		catch (Exception e)
+		{
+			Debug.LogError($"The error occurs when fetching neighbors: {e.Message} {e.InnerException?.Message}");
+		}
 	}
 
 	private bool DestroyBlockIfNotNecessary(Block block)

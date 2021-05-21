@@ -1061,7 +1061,7 @@ MonoBehaviour:
     type: 3}
   ChunkResolution: 10
   player: {fileID: 1545805705}
-  PlayerViewDistance: 75
+  PlayerViewDistance: 200
   NoiseScaleX: 0.005
   NoiseScaleZ: 0.0051
   NoiseOffsetX: 61658

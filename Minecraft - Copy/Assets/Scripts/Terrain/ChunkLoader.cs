@@ -6,7 +6,7 @@ using UnityEngine;
 
 public class ChunkLoader : MonoBehaviour
 {
-	[SerializeField] private SaveGame _saveGame;
+	[SerializeField] private SaveGame _saveGame = null;
 
 	public static ChunkLoader instance;
 
@@ -35,7 +35,9 @@ public class ChunkLoader : MonoBehaviour
 
 
 	private Dictionary<Vector2, Chunk> chunks = new Dictionary<Vector2, Chunk>();
-	
+
+	private Coroutine _spawnerCoroutine;
+
 	private void Start()
 	{
 		if(instance)
@@ -48,7 +50,7 @@ public class ChunkLoader : MonoBehaviour
 			instance = this;
 		}
 
-		StartCoroutine("SpawnChunks");
+		_spawnerCoroutine = StartCoroutine("SpawnChunks");
 	}
 
 	private void OnApplicationQuit()
@@ -58,6 +60,7 @@ public class ChunkLoader : MonoBehaviour
 
 	private IEnumerator SpawnChunks()
 	{
+		//int i = 0;
 		while(true)
 		{
 			Debug.Log("Spawning new Chunks.");
@@ -65,6 +68,9 @@ public class ChunkLoader : MonoBehaviour
 			//Task.Run(() => ShowChunksWithinView());
 			//Task.Run(() => HideChunksOutsideView());
 			ShowChunksWithinView();
+			//++i;
+			//if (i == 20)
+			//	break;
 			//HideChunksOutsideView();
 
 			yield return new WaitForSeconds(0.1F);
