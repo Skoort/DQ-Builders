@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -26,7 +27,7 @@ public class CreateBlockMesh : MonoBehaviour
 			verts.AddRange(BlockData.vertices[i]);
 			normals.AddRange(BlockData.normals[i]);
 			UVs.AddRange(BlockData.UVs3[i]);
-			quads.AddRange(BlockData.quads[i]);
+			quads.AddRange(BlockData.quad.Select(x => x + i * 4));
 		}
 
 		mesh.SetVertices(verts);

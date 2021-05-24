@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -38,7 +39,6 @@ public class Chunk : MonoBehaviour
 	private Vector3 _copyOfPositionForTask;
 
 	private bool _isDoneGenerating;
-	private bool _isBorderUpdateRequired;
 
 	private static readonly object locker;
 
@@ -51,8 +51,7 @@ public class Chunk : MonoBehaviour
 
 		var isChunkModified = _saveGame.HasChunkBeenModified(id);
 
-		InitMapData(isChunkModified);
-		ClearMeshData();
+		InitChunkData(isChunkModified);
 		Task.Run(() =>
 		{
 			if (isChunkModified)
@@ -88,19 +87,11 @@ public class Chunk : MonoBehaviour
 					}
 					try
 					{
-						GenerateBlocks();
+						GenerateBlocksAndMesh();
 					}
 					catch (Exception e3)
 					{
 						Debug.LogError($"Error generating chunk (3) {id}: {e3.Message} {e3.InnerException?.Message}");
-					}
-					try
-					{
-						GenerateMesh();
-					}
-					catch (Exception e4)
-					{
-						Debug.LogError($"Error generating chunk (4) {id}: {e4.Message} {e4.InnerException?.Message}");
 					}
 				}
 				catch (Exception e)
@@ -127,26 +118,21 @@ public class Chunk : MonoBehaviour
 				Debug.LogError($"Error showing mesh for chunk {id}: {e.Message} {e.InnerException?.Message}");
 			}
 		}
-
-		if (_isBorderUpdateRequired)
-		{
-			Task.Run(() => UpdateBorder());
-			_isBorderUpdateRequired = false;
-		}
 	}
 
-	private void InitMapData(bool isChunkModified)
+	private void InitChunkData(bool shouldLoadFromFile)
 	{
-		if (!isChunkModified)
+		if (!shouldLoadFromFile)
 		{
 			biomesmap = new float[resolution, resolution];
 			heightmap = new int[resolution, resolution];
 			blocks = new Dictionary<Vector3, Block>();
 			plants = new Dictionary<Vector3, Transform>();
 		}
+		InitMeshData();
 	}
 
-	private void ClearMeshData()
+	private void InitMeshData()
 	{
 		this.verts = new List<Vector3>();
 		this.normals = new List<Vector3>();
@@ -168,34 +154,7 @@ public class Chunk : MonoBehaviour
 		GetComponent<MeshFilter>().mesh = mesh;
 		GetComponent<MeshCollider>().sharedMesh = mesh;
 	}
-
-	private void FixNeighboringChunks()
-	{  // Fill in holes where the neighboring Chunk doesn't know about newly generated neighboring Air Blocks.
-		var neighboring_chunks = ChunkLoader.instance.GetNeighboringChunks(this.id);
-
-		foreach(var chunk in neighboring_chunks)
-		{
-			if(chunk != null && chunk.gameObject.activeInHierarchy)
-				chunk._isBorderUpdateRequired = true; // chunk.UpdateBorder();
-		}
-	}
-
-	private void UpdateBorder()
-	{  // Updates all Blocks on the (inside) border of this Chunk.
-		//Debug.Log("Fixing Chunk " + this.id);
-
-		foreach(var bp in blocks)
-		{
-			var pos = bp.Key;
-			var block = bp.Value;
-
-			if(pos.x == 0 || pos.x == resolution - 1 || pos.z == 0 || pos.z == resolution - 1)
-			{ 
-				UpdateBlock(block);
-			}
-		}
-	}
-
+	
 	private void GenerateBiomesmap()
 	{
 		//biomesmap = new float[resolution, resolution];
@@ -229,11 +188,8 @@ public class Chunk : MonoBehaviour
 		}
 	}
 
-	private void GenerateBlocks()
+	private void GenerateBlocksAndMesh()
 	{
-		//blocks = new Dictionary<Vector3, Block>();
-		//plants = new Dictionary<Vector3, Transform>();
-
 		for (int z = 0; z < resolution; ++z)
 		{
 			for (int x = 0; x < resolution; ++x)
@@ -257,26 +213,33 @@ public class Chunk : MonoBehaviour
 				for (var y = max_height; y > height; --y)
 				{
 					var pos = new Vector3(x, y, z);
-
-					//Debug.Log("Generating Air Block at: " + (transform.position + pos));
-
 					var block = new Block(pos, BlockType.AIR);
+
+					// Using the assumption that the map is always a heightmap, we can simplify the mesh
+					// generation process by a lot. We know that each air block has a connection in any
+					// direction if that neighboring height is equal to it's height. And only the bottom
+					// air block has a connection downwards.
+					for (int i = 0; i < heights.Length; ++i)
+					{
+						var faceId = i;  // The order of the returned heights matches the order of the faces of the mesh.
+						if (y == heights[faceId])
+						{
+							++block.num_connections;
+						}
+					}
+					if (y == height + 1)
+					{
+						++block.num_connections;
+					}
 
 					blocks.Add(pos, block);
 				}
-				/*
-				if(x + transform.position.x == 0 && z + transform.position.z == 0)
-				{
-					Debug.Log("Height of start is: " + (height + 1));
-				}
-				*/
+
 				// Create a navigable area at the bottom AIR block.
 				//Navigator.instance.AddNavigable(_copyOfPositionForTask + new Vector3(x, height + 1, z));
-
-
+				
 				// Check if you want to put a plant in this location.
-
-
+				
 				// Create the Ground Blocks.
 				for (var y = height; y > min_height; --y)
 				{
@@ -304,6 +267,24 @@ public class Chunk : MonoBehaviour
 					}
 
 					var block = new Block(pos, block_type);
+
+					// Using the assumption that the map is always a heightmap, we can simplify the mesh
+					// generation process by a lot. We know that the bottom face should never be drawn
+					// and the top face is only drawn for the first non-air block.
+					for (int i = 0; i < heights.Length; ++i)
+					{
+						var faceId = i;  // The order of the returned heights matches the order of the faces of the mesh.
+						if (y > heights[faceId])
+						{
+							++block.num_connections;
+							AddFace(block, faceId);
+						}
+					}
+					if (y == height)
+					{
+						++block.num_connections;
+						AddFace(block, 5);  // Hardcoded index of top face.
+					}
 
 					blocks.Add(pos, block);
 				}
@@ -394,7 +375,7 @@ public class Chunk : MonoBehaviour
 				return null;
 			} else
 			if (!_isDoneGenerating)
-			{  // We don't want to access this. We'll handle it in the border update.
+			{  // If loading mesh from save, we don't have to worry about this, as we saved this and the neighboring chunk's border changes.
 				return null;
 			} else
 			{  // This Chunk does not contain the key. Check if the key belongs to a different Chunk.
@@ -573,33 +554,7 @@ public class Chunk : MonoBehaviour
 			{
 				if (!blockSaveData.FaceVisibility[faceId]) continue;
 
-				var verts = new List<Vector3>(BlockData.vertices[faceId]);
-				var normals = BlockData.normals[faceId];
-				var UVs = BlockData.UVs3[faceId];
-				for (int i = 0; i < UVs.Length; ++i)  // Change the Z components of the UV to match the type of the block.
-				{
-					UVs[i].z = (int)(block.block_type - 1) * 3;
-				}
-
-				//var UVs2 = BlockData.UVs2[(int)block.block_type - 1];
-				var quad = new List<int>(BlockData.quads[0]);
-
-				var spot = (free_spots.Count > 0) ? free_spots.Pop() : this.verts.Count;
-				block.SetQuadIndex(faceId, spot);  // Put in the location of this Quad for the correct Quad.
-
-				// Modify the contents of the verts and quads.
-				for (int i = 0; i < 4; ++i)
-				{
-					verts[i] += block.id;  // Add the local position to the vertex.
-					quad[i] += spot;
-				}
-
-				// Since the mesh didn't exist before this call, there is no unused space and we have to modify the size of the List.
-				this.verts.AddRange(verts);
-				this.normals.AddRange(normals);
-				this.UVs.AddRange(UVs);
-				//this.UVs2.AddRange(UVs2);
-				this.quads.AddRange(quad);
+				AddFace(block, faceId);
 			}
 		}
 
@@ -615,14 +570,6 @@ public class Chunk : MonoBehaviour
 					++block.num_connections;
 				}
 			}
-		}
-	}
-
-	private void GenerateMesh()
-	{
-		foreach(var block in blocks.Values)
-		{
-			UpdateBlock(block);
 		}
 	}
 
@@ -652,56 +599,8 @@ public class Chunk : MonoBehaviour
 					try
 					{
 						++num_connections;
-
-						// Show this specific face.
-
-						var face = BlockData.ConvertDirToIdx(dir);  // The index into BlockData.vertices which holds the desired face's vertices.
-
-						if (block.GetQuadIndices()[face] != -1)  // We already drew this Quad, stop drawing it.
-							continue;
-
-						var verts = new List<Vector3>(BlockData.vertices[face]);
-						var normals = BlockData.normals[face];
-						var UVs = BlockData.UVs3[face];
-						for (int i = 0; i < UVs.Length; ++i)  // Change the Z components of the UV to match the type of the block.
-						{
-							UVs[i].z = (int)(block.block_type - 1) * 3;
-						}
-
-						//var UVs2 = BlockData.UVs2[(int)block.block_type - 1];
-						var quads = new List<int>(BlockData.quads[0]);
-
-						var spot = (free_spots.Count > 0) ? free_spots.Pop() : this.verts.Count;
-
-						block.SetQuadIndex(dir, spot);  // Put in the location of this Quad for the correct Quad.
-
-						// Modify the contents of the verts and quads.
-						for (int i = 0; i < 4; ++i)
-						{
-							verts[i] += pos;  // Add the local position to the vertex.
-							quads[i] += spot;
-						}
-
-						if (spot != this.verts.Count)
-						{
-							// Replace the old contents of that spot with the face.
-							for (int i = 0; i < 4; ++i)
-							{
-								this.verts[spot + i] = verts[i];
-								this.quads[spot + i] = quads[i];
-								this.UVs[spot + i] = UVs[i];
-								//this.UVs2[spot + i] = UVs2[i];
-								this.normals[spot + i] = normals[i];
-							}
-						}
-						else
-						{  // There is no unused space, we have to modify the size of the List.
-							this.verts.AddRange(verts);
-							this.normals.AddRange(normals);
-							this.UVs.AddRange(UVs);
-							//this.UVs2.AddRange(UVs2);
-							this.quads.AddRange(quads);
-						}
+						
+						AddFace(block, BlockData.ConvertDirToIdx(dir));
 					}
 					catch (Exception e)
 					{
@@ -714,7 +613,6 @@ public class Chunk : MonoBehaviour
 					{
 						var face = BlockData.ConvertDirToIdx(dir);  // The index into BlockData.vertices which holds the desired face's vertices.
 						var face_index = block.GetQuadIndices()[face];
-				
 						if(face_index != -1)  // We drew this Quad and yet it shouldn't be visible.
 						{
 							this.free_spots.Push(face_index);
@@ -747,6 +645,53 @@ public class Chunk : MonoBehaviour
 		catch (Exception e)
 		{
 			Debug.LogError($"The error occurs when fetching neighbors: {e.Message} {e.InnerException?.Message}");
+		}
+	}
+
+	private void AddFace(Block block, int faceId)
+	{
+		var blockQuadIndices = block.GetQuadIndices();
+		if (blockQuadIndices[faceId] != -1)
+			return;  // This quad is already being rendered.
+
+		var normals = BlockData.normals[faceId];
+		var verts = new List<Vector3>(BlockData.vertices[faceId]);
+		var UVs = BlockData.UVs3[faceId].ToArray();
+		//var UVs2 = BlockData.UVs2[(int)block.block_type - 1];
+		var quad = new List<int>(BlockData.quad);
+
+		var spot = (free_spots.Count > 0) ? free_spots.Pop() : this.verts.Count;
+
+		blockQuadIndices[faceId] = spot;  // Store the index to this face's quad (and other) info.
+
+		// Modify the contents of the UVs, verts and quad.
+		var pos = block.id;
+		for (int i = 0; i < 4; ++i)
+		{
+			UVs[i].z = (int)(block.block_type - 1) * 3;  // Change the Z components of the UV to match the type of the block.
+			verts[i] += pos;  // Add the local position to the vertex.
+			quad[i] += spot;  // Make the quad point to the correct vertices.
+		}
+
+		if (spot != this.verts.Count)
+		{
+			// Replace the old contents of that spot with the face.
+			for (int i = 0; i < 4; ++i)
+			{
+				this.verts[spot + i] = verts[i];
+				this.quads[spot + i] = quad[i];
+				this.UVs[spot + i] = UVs[i];
+				//this.UVs2[spot + i] = UVs2[i];
+				this.normals[spot + i] = normals[i];
+			}
+		}
+		else
+		{  // There is no unused space, we have to modify the size of the List.
+			this.verts.AddRange(verts);
+			this.normals.AddRange(normals);
+			this.UVs.AddRange(UVs);
+			//this.UVs2.AddRange(UVs2);
+			this.quads.AddRange(quad);
 		}
 	}
 
@@ -877,7 +822,6 @@ public class Chunk : MonoBehaviour
 
 		return old_block_type;
 	}
-
 
 	public void PlaceBlock(Block block, BlockType block_type)
 	{/*

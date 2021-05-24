@@ -166,4 +166,10 @@ public class HotbarUI : ItemContainerUI
 		inventory.AddItem(ItemDatabase.instance.block_to_item_table[block_type]);
 		UpdateUI();
 	}
+
+	public void PickupItem(int itemId, int quantity = 1)
+	{
+		inventory.AddItem(itemId, quantity);
+		UpdateUI();
+	}
 }

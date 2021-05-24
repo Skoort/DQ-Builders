@@ -24,7 +24,7 @@ public class Character : MonoBehaviour
 	private Transform crosshairUI = null;
 
 	[SerializeField]
-	private GameObject _blockItemDropPrefab;
+	private GameObject _blockItemDropPrefab = null;
 
 	private void Start()
 	{
@@ -134,7 +134,7 @@ public class Character : MonoBehaviour
 			{  // Same behavior regardless of the Block's type.
 				default:
 				{
-					hotbarUI.PickupBlock(block.block_type);
+					//hotbarUI.PickupBlock(block.block_type);
 
 					SpawnBlockItemDrop(chunk.transform.position + block.id + new Vector3(0.5F, 0.5F, 0.5F),
 						block.block_type);
@@ -214,7 +214,7 @@ public class Character : MonoBehaviour
 	private void SpawnBlockItemDrop(Vector3 globalPos, BlockType blockType)
 	{
 		var itemDrop = Instantiate(_blockItemDropPrefab, globalPos, Quaternion.Euler(0, Random.Range(0, 360), 0), null);
-		var textureComp = itemDrop.GetComponent<TextureBlockItemDrop>();
+		var textureComp = itemDrop.GetComponent<BlockItemDrop>();
 		if (textureComp)
 		{
 			textureComp.Initialize(blockType);
@@ -270,5 +270,10 @@ public class Character : MonoBehaviour
 			// Add a small constant to the smallestDeltaMag to represent the size of the ItemDrop.
 			collider.transform.position += smallestDir * (smallestDeltaMag + 0.2F);
 		}
+	}
+
+	public void AddToInventory(int itemId, int quantity = 1)
+	{
+		hotbarUI.PickupItem(itemId, quantity);
 	}
 }

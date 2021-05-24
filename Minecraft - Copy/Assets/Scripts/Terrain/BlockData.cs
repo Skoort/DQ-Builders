@@ -93,21 +93,7 @@ public static class BlockData
 		new Vector3[4] { new Vector3( 0, +1,  0), new Vector3( 0, +1,  0), new Vector3( 0, +1,  0), new Vector3( 0, +1,  0), },
 	};
 
-	public static readonly int[][] quads = new int[6][]
-	{ 
-		// -X
-		new int[4] { 4*0 + 0, 4*0 + 1, 4*0 + 2, 4*0 + 3 },
-		// +X
-		new int[4] { 4*1 + 0, 4*1 + 1, 4*1 + 2, 4*1 + 3 },
-		// -Z
-		new int[4] { 4*2 + 0, 4*2 + 1, 4*2 + 2, 4*2 + 3 },
-		// +Z
-		new int[4] { 4*3 + 0, 4*3 + 1, 4*3 + 2, 4*3 + 3 },
-		// -Y
-		new int[4] { 4*4 + 0, 4*4 + 1, 4*4 + 2, 4*4 + 3 },
-		// +Y
-		new int[4] { 4*5 + 0, 4*5 + 1, 4*5 + 2, 4*5 + 3 },
-	};
+	public static readonly int[] quad = new int[4] { 0, 1, 2, 3};
 
 	public static int ConvertDirToIdx(Vector3 dir)
 	{

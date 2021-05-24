@@ -12,6 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2618c504b6d6c4e4cb80ed39607e0a15, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _whoCanPickupTag: Player
+  _itemId: 0
   _meshFilter: {fileID: 6180298337999968143}
 --- !u!1001 &4316632116731837363
 PrefabInstance:
@@ -24,6 +26,21 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: Block Item Drop
+      objectReference: {fileID: 0}
+    - target: {fileID: 3281185390341415324, guid: 95a57b4cb0c669048bc1e6bde90ead82,
+        type: 3}
+      propertyPath: _baseAcc
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 3281185390341415324, guid: 95a57b4cb0c669048bc1e6bde90ead82,
+        type: 3}
+      propertyPath: _maxSpeed
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 3281185390341415324, guid: 95a57b4cb0c669048bc1e6bde90ead82,
+        type: 3}
+      propertyPath: _maxAttractionDistance
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1313346467516430147, guid: 95a57b4cb0c669048bc1e6bde90ead82,
         type: 3}
@@ -80,15 +97,15 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 6283612161797061425, guid: 95a57b4cb0c669048bc1e6bde90ead82,
-        type: 3}
-      propertyPath: _scaleSpeed
-      value: 10
-      objectReference: {fileID: 0}
     - target: {fileID: 179762385774684291, guid: 95a57b4cb0c669048bc1e6bde90ead82,
         type: 3}
       propertyPath: m_Radius
       value: 0.15
+      objectReference: {fileID: 0}
+    - target: {fileID: 6283612161797061425, guid: 95a57b4cb0c669048bc1e6bde90ead82,
+        type: 3}
+      propertyPath: _scaleSpeed
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 4655807250054200474, guid: 95a57b4cb0c669048bc1e6bde90ead82,
         type: 3}
@@ -110,7 +127,8 @@ PrefabInstance:
       propertyPath: m_LocalScale.z
       value: 0.15
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 7689253594517699276, guid: 95a57b4cb0c669048bc1e6bde90ead82, type: 3}
   m_SourcePrefab: {fileID: 100100000, guid: 95a57b4cb0c669048bc1e6bde90ead82, type: 3}
 --- !u!1 &6955431017006352092 stripped
 GameObject:
