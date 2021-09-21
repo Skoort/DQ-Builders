@@ -1,4 +1,6 @@
-﻿public static class MathUtils
+﻿using UnityEngine;
+
+public static class MathUtils
 {
 	public static int Mod(int x, int m)
 	{
@@ -18,5 +20,20 @@
 			pow >>= 1;
 		}
 		return ret;
+	}
+
+	public static bool TestCircleRectIntersection(Vector2 circleOrigin, float circleRadius, float rectLeft, float rectRight, float rectTop, float rectBottom)
+	{
+		// Find the closest point to the circle within the rectangle
+		float closestX = Mathf.Clamp(circleOrigin.x, rectLeft, rectRight);
+		float closestY = Mathf.Clamp(circleOrigin.y, rectTop, rectBottom);
+
+		// Calculate the distance between the circle's center and this closest point
+		float distanceX = circleOrigin.x - closestX;
+		float distanceY = circleOrigin.y - closestY;
+
+		// If the distance is less than the circle's radius, an intersection occurs
+		float distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+		return distanceSquared < (circleRadius * circleRadius);
 	}
 }

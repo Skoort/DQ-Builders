@@ -79,15 +79,18 @@ public class Chunk : MonoBehaviour
 		return existingLinks ?? _cachedEmptyDecorationListArray;
 	}
 
-
-
-
 	public Chunk Initialize(Vector2 chunk_id)
 	{
 		id = chunk_id;
+
+		return this;
+	}
+
+	public Chunk Load()
+	{
 		resolution = ChunkLoader.instance.ChunkResolution;
 
-		_copyOfPositionForTask = transform.position;
+		_copyOfPositionForTask = transform.position;  // TODO: Cancellation tokens for task. They might be cleaned up but still loading.
 
 		var isChunkModified = _saveGame.HasChunkBeenModified(id);
 
@@ -166,6 +169,8 @@ public class Chunk : MonoBehaviour
 
 	private MeshCollider _meshCollider;
 	private bool _shouldActivateCollisions;
+
+	public bool IsLoaded { get; internal set; }
 
 	public void RequestCollisions()
 	{

@@ -1059,20 +1059,22 @@ MonoBehaviour:
   _saveGame: {fileID: 11400000, guid: 9f1f08d6b226cf9439cdbf967560d26d, type: 2}
   ChunkPrefab: {fileID: 3442779951837275572, guid: d18ec8f1fef00ff4d8406efe6566575e,
     type: 3}
-  ChunkResolution: 10
+  ChunkResolution: 20
   player: {fileID: 1545805705}
-  PlayerViewDistance: 200
+  ViewDistance: 300
+  LoadDistance: 370
   NoiseScaleX: 0.005
   NoiseScaleZ: 0.0051
   NoiseOffsetX: 61658
   NoiseOffsetZ: 81878
-  NoiseAmplitude: 60
+  NoiseAmplitude: 61.11
   UseNoise2: 0
   NoiseScaleX2: 0.018
   NoiseScaleZ2: 0.018
   NoiseOffsetX2: 23411
   NoiseOffsetZ2: -2442
   NoiseAmplitude2: 40
+  _loadXChunksPerSecond: 100
   _keepChunksAroundFor: 10
 --- !u!1 &1095789622
 GameObject:
