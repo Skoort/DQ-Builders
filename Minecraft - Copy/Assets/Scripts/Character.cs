@@ -128,6 +128,9 @@ public class Character : MonoBehaviour
 			pos.x = MathUtils.Mod(Mathf.FloorToInt(pos.x), ChunkLoader.instance.ChunkResolution);
 			pos.z = MathUtils.Mod(Mathf.FloorToInt(pos.z), ChunkLoader.instance.ChunkResolution);
 
+			// Have a check to see if there is a link in this location, if yes, then just delete the link and ignore the rest.
+
+
 			var block = chunk.GetBlock(pos);
 
 			switch (block.block_type)
@@ -203,11 +206,28 @@ public class Character : MonoBehaviour
 			pos_to_place.x = MathUtils.Mod(Mathf.FloorToInt(pos_to_place.x), ChunkLoader.instance.ChunkResolution);
 			pos_to_place.z = MathUtils.Mod(Mathf.FloorToInt(pos_to_place.z), ChunkLoader.instance.ChunkResolution);
 
-			var air_to_replace = chunk_to_place.GetBlock(pos_to_place);
+			// Check if we are trying to place a block inside of any decoration. This is a big no-no.
+			if (chunk_to_place.GetDecorationLinks(pos_to_place).Any(x => x.requiredBlockState == DecorationLinkType.Default))
+			{
+				return;
+			}
 
-			chunk_to_place.PlaceBlock(air_to_replace, hotbarUI.RemSelectedBlock());
+			var removedItemId = hotbarUI.RemSelectedItem();
+			var removedItem = ItemDatabase.instance.items[removedItemId];
 
-			PushOutAllItemDropsInBlock(chunk_to_place, pos_to_place);
+			if (removedItem.placeabilityInfo == PlaceabilityInfo.BLOCK)
+			{
+				var air_to_replace = chunk_to_place.GetBlock(pos_to_place);
+				chunk_to_place.PlaceBlock(air_to_replace, removedItem.blockType);
+
+				PushOutAllItemDropsInBlock(chunk_to_place, pos_to_place);  // How to push items out of big areas like furniture?
+			} else
+			if (removedItem.placeabilityInfo == PlaceabilityInfo.DECOR
+			&& removedItem.decorationPrefab.CanPlace(pos_to_place))
+			{
+				var decoration = Instantiate(removedItem.decorationPrefab, pos_to_place + chunk_to_place.transform.position, Quaternion.identity);
+				decoration.Initialize(pos_to_place);
+			}
 		}
 	}
 

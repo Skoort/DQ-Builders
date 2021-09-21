@@ -7,7 +7,7 @@ using UnityEngine;
 
 public class Chunk : MonoBehaviour
 {
-	[SerializeField] private SaveGame _saveGame;
+	[SerializeField] private SaveGame _saveGame = null;
 
 	public Vector2 id;
 
@@ -26,6 +26,7 @@ public class Chunk : MonoBehaviour
 
 	private Dictionary<Vector3, Block> blocks;
 	private Dictionary<Vector3, Transform> plants;
+	private Dictionary<Vector3, List<DecorationLink>> _decorationLinks;
 
 	private List<Vector3> verts;
 	private List<Vector3> normals;
@@ -42,6 +43,45 @@ public class Chunk : MonoBehaviour
 
 	private static readonly object locker;
 
+
+	public void AddDecorationLink(Vector3 pos, DecorationLink furnitureLink)
+	{
+		if (!_decorationLinks.TryGetValue(pos, out var existingLinks))
+		{
+			existingLinks = new List<DecorationLink>();
+		}
+
+		// Check if we have invalidated any links by placing this furniture here.
+		foreach (var link in existingLinks)
+		{
+			if (furnitureLink.requiredBlockState == DecorationLinkType.Default
+			&& link.requiredBlockState == DecorationLinkType.Free)
+			{
+				Destroy(link.linkedDecoration.gameObject);
+			}
+		}
+
+		existingLinks.Add(furnitureLink);
+	}
+
+	public void RemDecorationLink(Vector3 pos, Decoration furniture)
+	{
+		if (_decorationLinks.TryGetValue(pos, out var existingLinks))
+		{
+			existingLinks.RemoveAll(x => x.linkedDecoration == furniture);
+		}
+	}
+
+	private readonly List<DecorationLink> _cachedEmptyDecorationListArray = new List<DecorationLink>(0);
+	public IEnumerable<DecorationLink> GetDecorationLinks(Vector3 pos)
+	{
+		_decorationLinks.TryGetValue(pos, out var existingLinks);
+		return existingLinks ?? _cachedEmptyDecorationListArray;
+	}
+
+
+
+
 	public Chunk Initialize(Vector2 chunk_id)
 	{
 		id = chunk_id;
@@ -51,56 +91,27 @@ public class Chunk : MonoBehaviour
 
 		var isChunkModified = _saveGame.HasChunkBeenModified(id);
 
+		_decorationLinks = new Dictionary<Vector3, List<DecorationLink>>();
+
+
 		InitChunkData(isChunkModified);
 		Task.Run(() =>
 		{
 			if (isChunkModified)
 			{
-				try
-				{
-					GenerateBlocksAndMeshFromSave();
-				}
-				catch (Exception e)
-				{
-					Debug.LogError($"Error generating chunk {id} from save: {e.Message} {e.InnerException?.Message}");
-				}
+				GenerateBlocksAndMeshFromSave();
 			}
 			else
 			{
-				try
-				{
-					try
-					{
-						GenerateBiomesmap();
-					}
-					catch (Exception e1)
-					{
-						Debug.LogError($"Error generating chunk (1) {id}: {e1.Message} {e1.InnerException?.Message}");
-					}
-					try
-					{
-						GenerateHeightmap();
-					}
-					catch (Exception e2)
-					{
-						Debug.LogError($"Error generating chunk (2) {id}: {e2.Message} {e2.InnerException?.Message}");
-					}
-					try
-					{
-						GenerateBlocksAndMesh();
-					}
-					catch (Exception e3)
-					{
-						Debug.LogError($"Error generating chunk (3) {id}: {e3.Message} {e3.InnerException?.Message}");
-					}
-				}
-				catch (Exception e)
-				{
-					Debug.LogError($"Error generating chunk {id}: {e.Message} {e.InnerException?.Message}");
-				}
+				GenerateBiomesmap();
+				GenerateHeightmap();
+				GenerateBlocksAndMesh();
 			}
 			_isDoneGenerating = true;
-		});
+		});  // Maybe turn Chunk into a non Monobehaviour so that we can instantiate Chunk prefabs with just a mesh and a
+		     // layer which is how we will tell that we hit a chunk, and then say find me what I hit plox. and we will have
+			 // a callback to where we created the gameobject instance with the mesh and assign that mesh the finished mesh.
+			 // that way we could move the queue handling to a different thread too.
 
 		return this;
 	}
@@ -109,13 +120,12 @@ public class Chunk : MonoBehaviour
 	{
 		if (_isDoneGenerating && mesh == null)
 		{
-			try
+			ShowMesh();
+
+			if (_shouldActivateCollisions)
 			{
-				ShowMesh();
-			}
-			catch (Exception e)
-			{
-				Debug.LogError($"Error showing mesh for chunk {id}: {e.Message} {e.InnerException?.Message}");
+				_shouldActivateCollisions = false;
+				ActivateCollisions();
 			}
 		}
 	}
@@ -152,7 +162,34 @@ public class Chunk : MonoBehaviour
 		this.mesh.SetIndices(this.quads.ToArray(), MeshTopology.Quads, 0);
 
 		GetComponent<MeshFilter>().mesh = mesh;
-		GetComponent<MeshCollider>().sharedMesh = mesh;
+	}
+
+	private MeshCollider _meshCollider;
+	private bool _shouldActivateCollisions;
+
+	public void RequestCollisions()
+	{
+		_shouldActivateCollisions = true;
+	}
+	
+	private void ActivateCollisions()
+	{
+		if (_meshCollider == null)
+		{
+			_meshCollider = gameObject.AddComponent<MeshCollider>();
+			_meshCollider.sharedMesh = mesh;
+		}
+	}
+
+	// Might cause problems if a collision request was made, but this deactivate was called before the collisions were made.
+	// Unlikely to cause real problems.
+	public void TryToDeactivateCollisions()
+	{
+		if (_meshCollider != null)
+		{
+			Destroy(_meshCollider);
+			_meshCollider = null;
+		}
 	}
 	
 	private void GenerateBiomesmap()
@@ -878,6 +915,18 @@ public class Chunk : MonoBehaviour
 			chunk.GetComponent<MeshCollider>().sharedMesh = chunk.mesh;
 		}
 	}
+
+
+
+
+
+	public void PickupDecoration(Vector3 position)
+	{
+
+	}
+
+
+
 
 	private void NotifySaveManagerOfUpdate(Chunk chunk, Block block, bool wasDestroyed)
 	{

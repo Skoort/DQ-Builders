@@ -1,6 +1,8 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -33,10 +35,22 @@ public class ChunkLoader : MonoBehaviour
 	public float NoiseOffsetZ2;
 	public float NoiseAmplitude2;
 
+	private Dictionary<Vector2, ChunkLifelineInfo> chunks = new Dictionary<Vector2, ChunkLifelineInfo>();
 
-	private Dictionary<Vector2, Chunk> chunks = new Dictionary<Vector2, Chunk>();
+	private Task _chunkSpawnerTask;
 
-	private Coroutine _spawnerCoroutine;
+	private object _lock = null;
+	private Vector3 _playerPosition;
+
+	[SerializeField] private float _keepChunksAroundFor = 10F;
+
+	private class ChunkLifelineInfo
+	{
+		public float TimeSinceLastLifelineTick { get; set; }
+		public float ChunkCreationProgress { get; set; }
+		public Vector2 ChunkId { get; set; }
+		public Chunk Chunk { get; set; }
+	}
 
 	private void Start()
 	{
@@ -48,9 +62,8 @@ public class ChunkLoader : MonoBehaviour
 		else
 		{
 			instance = this;
+			StartCoroutine(SpawnChunks());
 		}
-
-		_spawnerCoroutine = StartCoroutine("SpawnChunks");
 	}
 
 	private void OnApplicationQuit()
@@ -60,20 +73,103 @@ public class ChunkLoader : MonoBehaviour
 
 	private IEnumerator SpawnChunks()
 	{
-		//int i = 0;
 		while(true)
 		{
 			Debug.Log("Spawning new Chunks.");
-
-			//Task.Run(() => ShowChunksWithinView());
-			//Task.Run(() => HideChunksOutsideView());
+			
 			ShowChunksWithinView();
-			//++i;
-			//if (i == 20)
-			//	break;
-			//HideChunksOutsideView();
 
 			yield return new WaitForSeconds(0.1F);
+		}
+	}
+
+	private float _timeOfLastCall = -1;
+	private void ShowChunksWithinView()
+	{
+		// Redo this logic by making it draw VIEW_DISTANCE + BUFFER chunks. The buffer chunks are always
+		// inactive because they are behind the view distance (if there is distance fog they won't even be seen).
+		// They are initialized by priority of their max distance to the player's chunk (closest first). The chunk
+		// loader has a setting of how many chunks it can create per second, and it has an update loop that creates
+		// one chunk every 1 / CHUNK_LOADS_PER_SECOND seconds. Preferably it creates them in a swirly pattern as well,
+		// so that chunks of the same priority are created in a clock pattern. If the player's view distance reaches
+		// one of the buffer chunks, activate it. If the player walks BUFFER chunks away from the origin of the last 
+		// chunk creation, add more chunks to the draw queue like before. Finally, if any chunks remain in the draw
+		// queue when a new chunk load is scheduled, copy all those chunks into another ordered queue, and add them
+		// as well as the newly generated chunks (which are presumably generated in order), to the priority queue by
+		// comparing them. A loaded chunk has the IsLoaded flag set, which prevents it from being readded to the queue.
+
+		var newTime = Time.realtimeSinceStartup;
+		var dt = _timeOfLastCall == -1 ? 0 : newTime - _timeOfLastCall;
+		_timeOfLastCall = newTime;
+
+		var player_pos = new Vector2(player.position.x, player.position.z);
+		int ratio = Mathf.CeilToInt(PlayerViewDistance / ChunkResolution);
+		
+		// Get the Chunks enveloping the player.
+		for (int i = -ratio; i <= +ratio; ++i)
+		{
+			for (int j = -ratio; j <= +ratio; ++j)
+			{
+				var chunkId = GetChunkID(new Vector2(i, j) * ChunkResolution + player_pos);
+				
+				if (!chunks.TryGetValue(chunkId, out var lifelineInfo))
+				{
+					lifelineInfo = new ChunkLifelineInfo() { ChunkId = chunkId };
+					chunks.Add(chunkId, lifelineInfo);
+				}
+
+				// Send a life signal to the chunk. This has the effect of generating the chunks in layers, starting with the one with index (i=0, j=0).
+				var maxIndex = Math.Max(Math.Abs(i), Math.Abs(j));
+				var distanceFromCenter = 1 - maxIndex / (ratio + 1);
+				SendLifeSignal(lifelineInfo, chunkCreationSpeed: distanceFromCenter * distanceFromCenter, shouldCollide: true);//maxIndex <= 1);
+			}
+		}
+
+		UpdateChunks(dt);
+	}
+
+	private void UpdateChunks(float dt)
+	{
+		var chunksToDestroy = new List<ChunkLifelineInfo>();
+		foreach (var lifelineInfo in chunks.Values)
+		{
+			lifelineInfo.TimeSinceLastLifelineTick += dt;
+			if (lifelineInfo.TimeSinceLastLifelineTick > _keepChunksAroundFor)
+			{
+				chunksToDestroy.Add(lifelineInfo);
+			}
+		}
+
+		foreach (var chunk in chunksToDestroy)
+		{
+			if (chunk.Chunk != null)
+			{ 
+				Destroy(chunk.Chunk.gameObject);
+				chunk.Chunk = null;
+			}
+			chunks.Remove(chunk.ChunkId);
+		}
+	}
+
+	private void SendLifeSignal(ChunkLifelineInfo chunkLifelineInfo, float chunkCreationSpeed, bool shouldCollide)
+	{
+		chunkLifelineInfo.TimeSinceLastLifelineTick = 0;
+		chunkLifelineInfo.ChunkCreationProgress += 1 * chunkCreationSpeed;
+		if (chunkLifelineInfo.Chunk == null && chunkLifelineInfo.ChunkCreationProgress >= 5)
+		{
+			var chunkId = chunkLifelineInfo.ChunkId;
+			var chunkPos = new Vector3(chunkId.x, 0, chunkId.y) * ChunkResolution;
+
+			chunkLifelineInfo.Chunk = Instantiate<Chunk>(ChunkPrefab, chunkPos, Quaternion.identity, this.transform)
+				.Initialize(chunkId);
+		}
+		if (chunkLifelineInfo.Chunk != null && shouldCollide)
+		{
+			chunkLifelineInfo.Chunk.RequestCollisions();  // This should probably be done relatively often (we don't want the player falling off a cliff).
+		} 
+		else
+		{
+			chunkLifelineInfo.Chunk?.TryToDeactivateCollisions();
 		}
 	}
 
@@ -89,7 +185,7 @@ public class ChunkLoader : MonoBehaviour
 
 		if(chunks.ContainsKey(pos))
 		{
-			return chunks[pos];
+			return chunks[pos].Chunk;
 		}
 		else
 		{
@@ -101,7 +197,22 @@ public class ChunkLoader : MonoBehaviour
 	{
 		if(chunks.ContainsKey(id))
 		{
-			return chunks[id];
+			return chunks[id].Chunk;
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	public Block GetBlock(Vector3 pos)
+	{
+		var chunk = GetChunk(pos);
+		if (chunk)
+		{
+			pos.x = MathUtils.Mod(Mathf.FloorToInt(pos.x), ChunkResolution);
+			pos.z = MathUtils.Mod(Mathf.FloorToInt(pos.z), ChunkResolution);
+			return chunk.GetBlock(pos);
 		}
 		else
 		{
@@ -126,67 +237,5 @@ public class ChunkLoader : MonoBehaviour
 		pos.y = Mathf.Floor(pos.y / ChunkResolution);
 
 		return pos;
-	}
-
-	private void ShowChunksWithinView()
-	{
-		var player_pos = new Vector2(player.position.x, player.position.z);
-		int ratio = Mathf.CeilToInt(PlayerViewDistance / ChunkResolution);
-
-		var tasks = new List<Task>();
-
-		// Get the Chunks enveloping the player.
-		for(int i = -ratio; i < +ratio; ++i)
-		{
-			for(int j = -ratio; j < +ratio; ++j)
-			{
-				var chunk_id = GetChunkID(new Vector2(i, j) * ChunkResolution + player_pos);
-				var chunk_pos = new Vector3(chunk_id.x, 0, chunk_id.y) * ChunkResolution;
-
-				if(!chunks.ContainsKey(chunk_id))
-				{  // We have to create this Chunk.
-				   //Debug.Log("Spawning Chunk " + chunk_id);
-					var chunk = Instantiate<Chunk>(ChunkPrefab, chunk_pos, Quaternion.identity, this.transform)
-						.Initialize(chunk_id);  // Currently we generate the chunk even if it will immediately be made invisible.
-
-					chunks.Add(chunk.id, chunk);
-				} else
-				if(!chunks[chunk_id].gameObject.activeInHierarchy)
-				{
-					chunks[chunk_id].gameObject.SetActive(true);
-					//chunks[chunk_id].UpdateBorder();
-				}
-			}
-		}
-	}
-
-	private void HideChunksOutsideView()
-	{
-		var player_pos = new Vector2(player.position.x, player.position.z);
-
-		var chunks_to_destroy = new List<Vector2>();
-
-		foreach(var c in chunks)
-		{
-			var chunk_id = c.Key;
-			var chunk = c.Value;
-
-			var dst_to_chunk = (player_pos - (chunk_id + new Vector2(0.5F, 0.5F)) * ChunkResolution).magnitude;
-			var max_dst = PlayerViewDistance;
-			if(dst_to_chunk > 2 * max_dst)
-			{
-				chunks_to_destroy.Add(chunk_id);
-			} else
-			if(dst_to_chunk > max_dst && chunk.gameObject.activeInHierarchy)
-			{
-				chunk.gameObject.SetActive(false);
-			}
-		}
-
-		foreach(var chunk_id in chunks_to_destroy)
-		{
-			Destroy(chunks[chunk_id].gameObject);
-			chunks.Remove(chunk_id);
-		}
 	}
 }

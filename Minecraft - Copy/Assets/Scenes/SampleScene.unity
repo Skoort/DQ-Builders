@@ -14,7 +14,7 @@ OcclusionCullingSettings:
 RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 9
-  m_Fog: 0
+  m_Fog: 1
   m_FogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   m_FogMode: 3
   m_FogDensity: 0.01
@@ -1060,7 +1060,7 @@ MonoBehaviour:
   ChunkPrefab: {fileID: 3442779951837275572, guid: d18ec8f1fef00ff4d8406efe6566575e,
     type: 3}
   ChunkResolution: 10
-  player: {fileID: 511562911}
+  player: {fileID: 1545805705}
   PlayerViewDistance: 200
   NoiseScaleX: 0.005
   NoiseScaleZ: 0.0051
@@ -1073,6 +1073,7 @@ MonoBehaviour:
   NoiseOffsetX2: 23411
   NoiseOffsetZ2: -2442
   NoiseAmplitude2: 40
+  _keepChunksAroundFor: 10
 --- !u!1 &1095789622
 GameObject:
   m_ObjectHideFlags: 0
@@ -1565,11 +1566,11 @@ GameObject:
   - component: {fileID: 1545805700}
   m_Layer: 0
   m_Name: Controller
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1545805700
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1692,7 +1693,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1635135521}
   - component: {fileID: 1635135522}
-  m_Layer: 12
+  m_Layer: 0
   m_Name: Item Vacuum
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2017,12 +2018,43 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4569e2d88132ab84290735a5b3cdb52b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  icons:
-  - {fileID: 21300000, guid: 6b766c42d72f09048ac4a12155b3d5cc, type: 3}
-  - {fileID: 21300000, guid: a05fea4a2edf40b42b6b45e705b42962, type: 3}
-  - {fileID: 21300000, guid: 01b811eb3d00cdb48bc0c4572d912c4c, type: 3}
-  - {fileID: 21300000, guid: 8a322b686e598b446aa3a1d6a7556cb6, type: 3}
-  - {fileID: 21300000, guid: e03020a163f1ffb44b5eaaaf34cdc954, type: 3}
+  items:
+  - id: 0
+    name: Dirt
+    max_stack: 64
+    placeabilityInfo: 0
+    decorationPrefab: {fileID: 0}
+    blockType: 1
+    sprite: {fileID: 21300000, guid: 6b766c42d72f09048ac4a12155b3d5cc, type: 3}
+  - id: 0
+    name: Grass
+    max_stack: 64
+    placeabilityInfo: 0
+    decorationPrefab: {fileID: 0}
+    blockType: 2
+    sprite: {fileID: 21300000, guid: a05fea4a2edf40b42b6b45e705b42962, type: 3}
+  - id: 0
+    name: Stone
+    max_stack: 64
+    placeabilityInfo: 0
+    decorationPrefab: {fileID: 0}
+    blockType: 3
+    sprite: {fileID: 21300000, guid: 01b811eb3d00cdb48bc0c4572d912c4c, type: 3}
+  - id: 0
+    name: Crafting Table
+    max_stack: 64
+    placeabilityInfo: 1
+    decorationPrefab: {fileID: 7945791387461885539, guid: 5fae2a23878713f42aac46cc86ea642b,
+      type: 3}
+    blockType: 4
+    sprite: {fileID: 21300000, guid: 8a322b686e598b446aa3a1d6a7556cb6, type: 3}
+  - id: 0
+    name: Sand
+    max_stack: 64
+    placeabilityInfo: 0
+    decorationPrefab: {fileID: 0}
+    blockType: 5
+    sprite: {fileID: 21300000, guid: e03020a163f1ffb44b5eaaaf34cdc954, type: 3}
 --- !u!114 &1812850841
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2480,7 +2512,7 @@ PrefabInstance:
     - target: {fileID: 5993618224683944338, guid: cf1416949ea8f3e44ba9cac1a9a8bf51,
         type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5993618224683944338, guid: cf1416949ea8f3e44ba9cac1a9a8bf51,
         type: 3}
@@ -2490,17 +2522,17 @@ PrefabInstance:
     - target: {fileID: 5993618224683944338, guid: cf1416949ea8f3e44ba9cac1a9a8bf51,
         type: 3}
       propertyPath: m_Layer
-      value: 11
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5993618224683944339, guid: cf1416949ea8f3e44ba9cac1a9a8bf51,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: -5
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5993618224683944339, guid: cf1416949ea8f3e44ba9cac1a9a8bf51,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: 5.5
+      value: 100
       objectReference: {fileID: 0}
     - target: {fileID: 5993618224683944339, guid: cf1416949ea8f3e44ba9cac1a9a8bf51,
         type: 3}

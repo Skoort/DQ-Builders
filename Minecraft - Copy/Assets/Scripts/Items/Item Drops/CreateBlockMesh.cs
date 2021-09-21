@@ -11,6 +11,7 @@ public class CreateBlockMesh : MonoBehaviour
 
     private void Start()
     {
+		/*
 		var gameObject = new GameObject("Block Prefab", typeof(MeshFilter), typeof(MeshRenderer));
 		var meshFilter = gameObject.GetComponent<MeshFilter>();
 		var meshRenderer = gameObject.GetComponent<MeshRenderer>();
@@ -47,5 +48,6 @@ public class CreateBlockMesh : MonoBehaviour
 		{
 			Debug.LogError("Failed to make block prefab!");
 		}
+		*/
 	}
 }

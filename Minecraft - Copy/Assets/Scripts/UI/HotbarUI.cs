@@ -148,7 +148,7 @@ public class HotbarUI : ItemContainerUI
 			return false;
 		}
 
-		return ItemDatabase.instance.items[item.ItemID].placeable;
+		return ItemDatabase.instance.items[item.ItemID].placeabilityInfo != PlaceabilityInfo.NOT_PLACEABLE;
 	}
 
 	public BlockType RemSelectedBlock()
@@ -159,6 +159,16 @@ public class HotbarUI : ItemContainerUI
 		UpdateUI();
 
 		return ItemDatabase.instance.item_to_block_table[item_type];
+	}
+
+	public int RemSelectedItem()
+	{
+		var item_type = item_container.GetItem(selected_index).ItemID;
+
+		inventory.RemItem(selected_index, 1);
+		UpdateUI();
+
+		return item_type;
 	}
 
 	public void PickupBlock(BlockType block_type)

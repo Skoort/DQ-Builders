@@ -5,18 +5,19 @@ using UnityEngine;
 public class ItemDatabase : MonoBehaviour
 {
 	public static ItemDatabase instance;
-
+	/*
 	[SerializeField]
 	private List<Sprite> icons = null;  // Set in the Inspector.
-
-	public Dictionary<int, Item> items;
+	*/
+	//public Dictionary<int, Item> items;
+	public List<Item> items;
 
 	public Dictionary<BlockType, int> block_to_item_table;
 	public Dictionary<int, BlockType> item_to_block_table;
 
 	private void Awake()
 	{
-		if(instance)
+		if (instance)
 		{
 			Destroy(this.gameObject);
 			return;
@@ -24,25 +25,25 @@ public class ItemDatabase : MonoBehaviour
 
 		instance = this;
 
+		/*
 		items = new Dictionary<int, Item>();
-		items.Add(0, new Item(0, "Dirt"          , 64, true, icons[0]));
-		items.Add(1, new Item(1, "Grass"         , 64, true, icons[1]));
-		items.Add(2, new Item(2, "Stone"         , 64, true, icons[2]));
-		items.Add(3, new Item(3, "Crafting Table", 64, true, icons[3]));
-		items.Add(4, new Item(4, "Sand"          , 64, true, icons[4]));
+		items.Add(0, new Item(0, "Dirt", 64, PlaceabilityInfo.BLOCK, null, BlockType.DIRT, icons[0]));
+		items.Add(1, new Item(1, "Grass", 64, PlaceabilityInfo.BLOCK, null, BlockType.GRASS, icons[1]));
+		items.Add(2, new Item(2, "Stone", 64, PlaceabilityInfo.BLOCK, null, BlockType.STONE, icons[2]));
+		items.Add(3, new Item(3, "Crafting Table", 64, PlaceabilityInfo.DECOR, null, default, icons[3]));  // TODO: Add reference to prefab using EditorUtility.FindAsset.
+		items.Add(4, new Item(4, "Sand", 64, PlaceabilityInfo.BLOCK, null, BlockType.SAND, icons[4]));
+		*/
 
 		block_to_item_table = new Dictionary<BlockType, int>();
-		block_to_item_table.Add(BlockType.DIRT, 0);
-		block_to_item_table.Add(BlockType.GRASS, 1);
-		block_to_item_table.Add(BlockType.STONE, 2);
-		block_to_item_table.Add(BlockType.CRAFTING_TABLE, 3);
-		block_to_item_table.Add(BlockType.SAND, 4);
-
 		item_to_block_table = new Dictionary<int, BlockType>();
-		item_to_block_table.Add(0, BlockType.DIRT);
-		item_to_block_table.Add(1, BlockType.GRASS);
-		item_to_block_table.Add(2, BlockType.STONE);
-		item_to_block_table.Add(3, BlockType.CRAFTING_TABLE);
-		item_to_block_table.Add(4, BlockType.SAND);
+		for (int i = 0; i < items.Count; ++i)
+		{
+			var item = items[i];
+			if (item.placeabilityInfo == PlaceabilityInfo.BLOCK)
+			{
+				block_to_item_table.Add(item.blockType, i);
+				item_to_block_table.Add(i, item.blockType);
+			}
+		}
 	}
 }
